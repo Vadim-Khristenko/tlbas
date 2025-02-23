@@ -1,5 +1,5 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2024
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2025
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -23,6 +23,9 @@ ServerCpuStat::ServerCpuStat() {
 void ServerCpuStat::update(double now) {
   auto r_cpu_stat = td::cpu_stat();
   if (r_cpu_stat.is_error()) {
+    if (r_cpu_stat.error().message() != "Not supported") {
+      LOG(ERROR) << "Failed to get CPU statistics: " << r_cpu_stat.error();
+    }
     return;
   }
 
