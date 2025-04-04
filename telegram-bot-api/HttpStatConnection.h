@@ -28,6 +28,7 @@ class HttpStatConnection final : public td::HttpInboundConnection::Callback {
  private:
   td::ActorId<ClientManager> client_manager_;
   td::ActorOwn<td::HttpInboundConnection> connection_;
+  int format_type_ = 0;
 
   void on_result(td::Result<td::BufferSlice> result);
 

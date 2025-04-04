@@ -183,31 +183,45 @@ ClientManager::TopClients ClientManager::get_top_clients(std::size_t max_count, 
 
 void ClientManager::get_stats(td::Promise<td::BufferSlice> promise,
                               td::vector<std::pair<td::string, td::string>> args) {
+  int format_type = 0;
+  for (auto &arg : args) {
+    if (arg.first == "format") {
+      if (arg.second == "html") {
+        format_type = 1;
+      } else if (arg.second == "json") {
+        format_type = 2;
+      }
+    }
+  }
+  
+  get_stats(std::move(promise), std::move(args), format_type);
+}
+
+void ClientManager::get_stats(td::Promise<td::BufferSlice> promise,
+                              td::vector<std::pair<td::string, td::string>> args,
+                              int format_type) {
   if (close_flag_) {
     promise.set_value(td::BufferSlice("Closing"));
     return;
   }
-  size_t buf_size = 1 << 14;
-  auto buf = td::StackAllocator::alloc(buf_size);
-  td::StringBuilder sb(buf.as_slice());
 
   td::Slice id_filter;
   int new_verbosity_level = -1;
   td::string tag;
+  
   for (auto &arg : args) {
     if (arg.first == "id") {
       id_filter = arg.second;
-    }
-    if (arg.first == "v") {
+    } else if (arg.first == "v") {
       auto r_new_verbosity_level = td::to_integer_safe<int>(arg.second);
       if (r_new_verbosity_level.is_ok()) {
         new_verbosity_level = r_new_verbosity_level.ok();
       }
-    }
-    if (arg.first == "tag") {
+    } else if (arg.first == "tag") {
       tag = arg.second;
     }
   }
+  
   if (new_verbosity_level > 0) {
     if (tag.empty()) {
       parameters_->shared_data_->next_verbosity_level_ = new_verbosity_level;
@@ -217,88 +231,863 @@ void ClientManager::get_stats(td::Promise<td::BufferSlice> promise,
   }
 
   auto now = td::Time::now();
+  auto stats_data = collect_stats_data(now, id_filter);
+  
+  if (format_type == 0) {
+    promise.set_value(format_stats_as_text(stats_data));
+  } else if (format_type == 1) {
+    promise.set_value(format_stats_as_html(stats_data));
+  } else if (format_type == 2) {
+    promise.set_error(td::Status::Error(400, "Bad Request: JSON format is not supported yet"));
+  } else {
+    promise.set_error(td::Status::Error(400, "Bad Request: invalid format specified"));
+  }
+}
+
+ClientManager::ServerStats ClientManager::collect_stats_data(double now, td::Slice id_filter) {
+  ServerStats stats;
   auto top_clients = get_top_clients(50, id_filter);
-  sb << BotStatActor::get_description() << '\n';
+  
   if (id_filter.empty()) {
-    sb << "uptime\t" << now - parameters_->start_time_ << '\n';
-    sb << "bot_count\t" << clients_.size() << '\n';
-    sb << "active_bot_count\t" << top_clients.active_count << '\n';
+    stats.uptime = now - parameters_->start_time_;
+    stats.bot_count = clients_.size();
+    stats.active_bot_count = top_clients.active_count;
+    
     auto r_mem_stat = td::mem_stat();
     if (r_mem_stat.is_ok()) {
       auto mem_stat = r_mem_stat.move_as_ok();
-      sb << "rss\t" << td::format::as_size(mem_stat.resident_size_) << '\n';
-      sb << "vm\t" << td::format::as_size(mem_stat.virtual_size_) << '\n';
-      sb << "rss_peak\t" << td::format::as_size(mem_stat.resident_size_peak_) << '\n';
-      sb << "vm_peak\t" << td::format::as_size(mem_stat.virtual_size_peak_) << '\n';
+      stats.memory.resident_size = mem_stat.resident_size_;
+      stats.memory.virtual_size = mem_stat.virtual_size_;
+      stats.memory.resident_size_peak = mem_stat.resident_size_peak_;
+      stats.memory.virtual_size_peak = mem_stat.virtual_size_peak_;
     } else {
       LOG(INFO) << "Failed to get memory statistics: " << r_mem_stat.error();
     }
-
-    auto cpu_stats = ServerCpuStat::instance().as_vector(td::Time::now());
-    for (auto &stat : cpu_stats) {
-      sb << stat.key_ << "\t" << stat.value_ << '\n';
-    }
-
-    sb << "buffer_memory\t" << td::format::as_size(td::BufferAllocator::get_buffer_mem()) << '\n';
-    sb << "active_webhook_connections\t" << WebhookActor::get_total_connection_count() << '\n';
-    sb << "active_requests\t" << parameters_->shared_data_->query_count_.load(std::memory_order_relaxed) << '\n';
-    sb << "active_network_queries\t" << td::get_pending_network_query_count(*parameters_->net_query_stats_) << '\n';
-    auto stats = stat_.as_vector(now);
-    for (auto &stat : stats) {
-      sb << stat.key_ << "\t" << stat.value_ << '\n';
-    }
+    
+    stats.cpu_stats = ServerCpuStat::instance().as_vector(now);
+    stats.buffer_memory = td::BufferAllocator::get_buffer_mem();
+    stats.active_webhook_connections = WebhookActor::get_total_connection_count();
+    stats.active_requests = parameters_->shared_data_->query_count_.load(std::memory_order_relaxed);
+    stats.active_network_queries = td::get_pending_network_query_count(*parameters_->net_query_stats_);
+    stats.server_stats = stat_.as_vector(now);
   }
-
+  
   for (auto top_client_id : top_clients.top_client_ids) {
     auto *client_info = clients_.get(top_client_id);
     CHECK(client_info);
-
+    
+    ServerStats::BotStats bot_stats;
     auto bot_info = client_info->client_.get_actor_unsafe()->get_bot_info();
-    auto active_request_count = client_info->stat_.get_active_request_count();
-    auto active_file_upload_bytes = client_info->stat_.get_active_file_upload_bytes();
-    auto active_file_upload_count = client_info->stat_.get_active_file_upload_count();
-    sb << '\n';
-    sb << "id\t" << bot_info.id_ << '\n';
-    sb << "uptime\t" << now - bot_info.start_time_ << '\n';
-    sb << "token\t" << bot_info.token_ << '\n';
-    sb << "username\t" << bot_info.username_ << '\n';
-    if (active_request_count != 0) {
-      sb << "active_request_count\t" << active_request_count << '\n';
-    }
-    if (active_file_upload_bytes != 0) {
-      sb << "active_file_upload_bytes\t" << active_file_upload_bytes << '\n';
-    }
-    if (active_file_upload_count != 0) {
-      sb << "active_file_upload_count\t" << active_file_upload_count << '\n';
-    }
-    if (!bot_info.webhook_.empty()) {
-      sb << "webhook\t" << bot_info.webhook_ << '\n';
-      if (bot_info.has_webhook_certificate_) {
-        sb << "has_custom_certificate\t" << bot_info.has_webhook_certificate_ << '\n';
-      }
-      if (bot_info.webhook_max_connections_ != parameters_->default_max_webhook_connections_) {
-        sb << "webhook_max_connections\t" << bot_info.webhook_max_connections_ << '\n';
-      }
-    }
-    sb << "head_update_id\t" << bot_info.head_update_id_ << '\n';
-    if (bot_info.pending_update_count_ != 0) {
-      sb << "tail_update_id\t" << bot_info.tail_update_id_ << '\n';
-      sb << "pending_update_count\t" << bot_info.pending_update_count_ << '\n';
-    }
+    
+    bot_stats.id = td::to_integer<td::int64>(bot_info.id_);
+    bot_stats.uptime = now - bot_info.start_time_;
+    bot_stats.token = bot_info.token_;
+    bot_stats.username = bot_info.username_;
+    bot_stats.active_request_count = client_info->stat_.get_active_request_count();
+    bot_stats.active_file_upload_bytes = client_info->stat_.get_active_file_upload_bytes();
+    bot_stats.active_file_upload_count = client_info->stat_.get_active_file_upload_count();
+    bot_stats.webhook = bot_info.webhook_;
+    bot_stats.has_webhook_certificate = bot_info.has_webhook_certificate_;
+    bot_stats.webhook_max_connections = bot_info.webhook_max_connections_;
+    bot_stats.head_update_id = bot_info.head_update_id_;
+    bot_stats.tail_update_id = bot_info.tail_update_id_;
+    bot_stats.pending_update_count = bot_info.pending_update_count_;
+    bot_stats.stats = client_info->stat_.as_vector(now);
+    
+    stats.bots.push_back(std::move(bot_stats));
+  }
+  
+  return stats;
+}
 
-    auto stats = client_info->stat_.as_vector(now);
-    for (auto &stat : stats) {
+td::BufferSlice ClientManager::format_stats_as_text(const ServerStats& stats) {
+  size_t buf_size = 1 << 14;
+  auto buf = td::StackAllocator::alloc(buf_size);
+  td::StringBuilder sb(buf.as_slice());
+  
+  sb << BotStatActor::get_description() << '\n';
+  
+  if (stats.bots.empty() || stats.bot_count != 0) {
+    sb << "uptime\t" << stats.uptime << '\n';
+    sb << "bot_count\t" << stats.bot_count << '\n';
+    sb << "active_bot_count\t" << stats.active_bot_count << '\n';
+    
+    if (stats.memory.resident_size > 0) {
+      sb << "rss\t" << td::format::as_size(stats.memory.resident_size) << '\n';
+      sb << "vm\t" << td::format::as_size(stats.memory.virtual_size) << '\n';
+      sb << "rss_peak\t" << td::format::as_size(stats.memory.resident_size_peak) << '\n';
+      sb << "vm_peak\t" << td::format::as_size(stats.memory.virtual_size_peak) << '\n';
+    }
+    
+    for (const auto& stat : stats.cpu_stats) {
+      sb << stat.key_ << "\t" << stat.value_ << '\n';
+    }
+    
+    sb << "buffer_memory\t" << td::format::as_size(stats.buffer_memory) << '\n';
+    sb << "active_webhook_connections\t" << stats.active_webhook_connections << '\n';
+    sb << "active_requests\t" << stats.active_requests << '\n';
+    sb << "active_network_queries\t" << stats.active_network_queries << '\n';
+    
+    for (const auto& stat : stats.server_stats) {
+      sb << stat.key_ << "\t" << stat.value_ << '\n';
+    }
+  }
+  
+  for (const auto& bot : stats.bots) {
+    sb << '\n';
+    sb << "id\t" << bot.id << '\n';
+    sb << "uptime\t" << bot.uptime << '\n';
+    sb << "token\t" << bot.token << '\n';
+    sb << "username\t" << bot.username << '\n';
+    
+    if (bot.active_request_count != 0) {
+      sb << "active_request_count\t" << bot.active_request_count << '\n';
+    }
+    if (bot.active_file_upload_bytes != 0) {
+      sb << "active_file_upload_bytes\t" << bot.active_file_upload_bytes << '\n';
+    }
+    if (bot.active_file_upload_count != 0) {
+      sb << "active_file_upload_count\t" << bot.active_file_upload_count << '\n';
+    }
+    
+    if (!bot.webhook.empty()) {
+      sb << "webhook\t" << bot.webhook << '\n';
+      if (bot.has_webhook_certificate) {
+        sb << "has_custom_certificate\t" << bot.has_webhook_certificate << '\n';
+      }
+      if (bot.webhook_max_connections != parameters_->default_max_webhook_connections_) {
+        sb << "webhook_max_connections\t" << bot.webhook_max_connections << '\n';
+      }
+    }
+    
+    sb << "head_update_id\t" << bot.head_update_id << '\n';
+    if (bot.pending_update_count != 0) {
+      sb << "tail_update_id\t" << bot.tail_update_id << '\n';
+      sb << "pending_update_count\t" << bot.pending_update_count << '\n';
+    }
+    
+    for (const auto& stat : bot.stats) {
       if (stat.key_ == "update_count" || stat.key_ == "request_count") {
         sb << stat.key_ << "/sec\t" << stat.value_ << '\n';
       }
     }
-
+    
     if (sb.is_error()) {
       break;
     }
   }
-  // ignore sb overflow
-  promise.set_value(td::BufferSlice(sb.as_cslice()));
+  
+  return td::BufferSlice(sb.as_cslice());
+}
+
+td::string format_size(td::uint64 size) {
+  size_t buf_size = 1 << 6;
+  auto buf = td::StackAllocator::alloc(buf_size);
+  td::StringBuilder sb(buf.as_slice());
+  sb << td::format::as_size(size);
+  return sb.as_cslice().str();
+}
+
+td::BufferSlice ClientManager::format_stats_as_html(const ServerStats& stats) {
+  td::string html = "<!DOCTYPE html>\n"
+                    "<html>\n"
+                    "<head>\n"
+                    "  <title>Telegram Bot API Server Statistics</title>\n"
+                    "  <meta charset=\"utf-8\">\n"
+                    "  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n"
+                    "  <style>\n"
+                    "    :root {\n"
+                    "      --primary: #0088cc;\n"
+                    "      --primary-light: #e7f5fb;\n"
+                    "      --secondary: #666;\n"
+                    "      --bg-light: #f8f9fa;\n"
+                    "      --border: #e0e0e0;\n"
+                    "      --box-shadow: 0 2px 10px rgba(0,0,0,0.1);\n"
+                    "      --text-color: #333;\n"
+                    "      --bg-color: #fafafa;\n"
+                    "      --card-bg: white;\n"
+                    "      --header-bg: var(--primary);\n"
+                    "      --header-text: white;\n"
+                    "      --copyable-bg: #e7f5fb;\n"
+                    "      --copyable-success: #8fd4ff;\n"
+                    "    }\n"
+                    "    \n"
+                    "    body.dark-mode {\n"
+                    "      --primary: #1e88e5;\n"
+                    "      --primary-light: #1e3a5f;\n"
+                    "      --secondary: #aaa;\n"
+                    "      --bg-light: #242424;\n"
+                    "      --border: #444;\n"
+                    "      --box-shadow: 0 2px 10px rgba(0,0,0,0.3);\n"
+                    "      --text-color: #eee;\n"
+                    "      --bg-color: #121212;\n"
+                    "      --card-bg: #1e1e1e;\n"
+                    "      --header-bg: #223b5c;\n"
+                    "      --header-text: #e6e6e6;\n"
+                    "      --copyable-bg: #1e3a5f;\n"
+                    "      --copyable-success: #3a6ea5;\n"
+                    "    }\n"
+                    "\n"
+                    "    @media (prefers-color-scheme: dark) {\n"
+                    "      :root.system-theme {\n"
+                    "        --primary: #1e88e5;\n"
+                    "        --primary-light: #1e3a5f;\n"
+                    "        --secondary: #aaa;\n"
+                    "        --bg-light: #242424;\n"
+                    "        --border: #444;\n"
+                    "        --box-shadow: 0 2px 10px rgba(0,0,0,0.3);\n"
+                    "        --text-color: #eee;\n"
+                    "        --bg-color: #121212;\n"
+                    "        --card-bg: #1e1e1e;\n"
+                    "        --header-bg: #223b5c;\n"
+                    "        --header-text: #e6e6e6;\n"
+                    "        --copyable-bg: #1e3a5f;\n"
+                    "        --copyable-success: #3a6ea5;\n"
+                    "      }\n"
+                    "    }\n"
+                    "    \n"
+                    "    body {\n"
+                    "      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;\n"
+                    "      margin: 0;\n"
+                    "      padding: 20px;\n"
+                    "      color: var(--text-color);\n"
+                    "      background-color: var(--bg-color);\n"
+                    "      transition: background-color 0.3s ease, color 0.3s ease;\n"
+                    "    }\n"
+                    "    h1, h2, h3 {\n"
+                    "      color: var(--primary);\n"
+                    "      margin-top: 0;\n"
+                    "      transition: color 0.3s ease;\n"
+                    "    }\n"
+                    "    .content-wrapper {\n"
+                    "      max-width: 1400px;\n"
+                    "      margin: 0 auto;\n"
+                    "      padding: 0 10px;\n"
+                    "    }\n"
+                    "    .stats-container {\n"
+                    "      display: flex;\n"
+                    "      flex-direction: column;\n"
+                    "      gap: 20px;\n"
+                    "      margin-bottom: 20px;\n"
+                    "    }\n"
+                    "    .stats-row {\n"
+                    "      display: grid;\n"
+                    "      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));\n"
+                    "      gap: 20px;\n"
+                    "    }\n"
+                    "    .stats-row-wide {\n"
+                    "      grid-column: 1 / -1;\n"
+                    "    }\n"
+                    "    .stats-box {\n"
+                    "      background: var(--card-bg);\n"
+                    "      border-radius: 10px;\n"
+                    "      padding: 15px;\n"
+                    "      width: 100%;\n"
+                    "      box-shadow: var(--box-shadow);\n"
+                    "      border: 1px solid var(--border);\n"
+                    "      overflow: hidden;\n"
+                    "      box-sizing: border-box;\n"
+                    "      transition: background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;\n"
+                    "    }\n"
+                    "    .stat-row {\n"
+                    "      display: flex;\n"
+                    "      justify-content: space-between;\n"
+                    "      margin-bottom: 12px;\n"
+                    "      padding-bottom: 12px;\n"
+                    "      border-bottom: 1px solid var(--border);\n"
+                    "      flex-wrap: wrap;\n"
+                    "      transition: border-color 0.3s ease;\n"
+                    "    }\n"
+                    "    .stat-row:last-child {\n"
+                    "      border-bottom: none;\n"
+                    "      margin-bottom: 0;\n"
+                    "      padding-bottom: 0;\n"
+                    "    }\n"
+                    "    .stat-label {\n"
+                    "      color: var(--secondary);\n"
+                    "      margin-right: 10px;\n"
+                    "      flex: 1;\n"
+                    "      min-width: 120px;\n"
+                    "      transition: color 0.3s ease;\n"
+                    "    }\n"
+                    "    .stat-value {\n"
+                    "      font-weight: 600;\n"
+                    "      text-align: right;\n"
+                    "      flex: 2;\n"
+                    "      word-break: break-word;\n"
+                    "      transition: color 0.3s ease;\n"
+                    "    }\n"
+                    "    .copyable {\n"
+                    "      cursor: pointer;\n"
+                    "      position: relative;\n"
+                    "      padding: 2px 8px;\n"
+                    "      border-radius: 4px;\n"
+                    "      background-color: var(--copyable-bg);\n"
+                    "      transition: background-color 0.3s ease;\n"
+                    "      display: inline-block;\n"
+                    "      max-width: 100%;\n"
+                    "      overflow: hidden;\n"
+                    "      text-overflow: ellipsis;\n"
+                    "    }\n"
+                    "    .copyable:hover {\n"
+                    "      background-color: var(--primary-light);\n"
+                    "      filter: brightness(1.1);\n"
+                    "    }\n"
+                    "    .copyable::after {\n"
+                    "      content: 'Copy';\n"
+                    "      position: absolute;\n"
+                    "      top: -25px;\n"
+                    "      left: 50%;\n"
+                    "      transform: translateX(-50%);\n"
+                    "      padding: 3px 8px;\n"
+                    "      border-radius: 3px;\n"
+                    "      background: rgba(0,0,0,0.7);\n"
+                    "      color: white;\n"
+                    "      font-size: 12px;\n"
+                    "      opacity: 0;\n"
+                    "      pointer-events: none;\n"
+                    "      transition: opacity 0.2s;\n"
+                    "      z-index: 10;\n"
+                    "    }\n"
+                    "    .copyable:hover::after {\n"
+                    "      opacity: 1;\n"
+                    "    }\n"
+                    "    .bot-container {\n"
+                    "      margin-top: 40px;\n"
+                    "    }\n"
+                    "    .bot-card {\n"
+                    "      margin-bottom: 30px;\n"
+                    "      border-radius: 10px;\n"
+                    "      overflow: hidden;\n"
+                    "      box-shadow: var(--box-shadow);\n"
+                    "      transition: box-shadow 0.3s ease;\n"
+                    "    }\n"
+                    "    .bot-header {\n"
+                    "      background: var(--header-bg);\n"
+                    "      color: var(--header-text);\n"
+                    "      padding: 15px 20px;\n"
+                    "      display: flex;\n"
+                    "      justify-content: space-between;\n"
+                    "      align-items: center;\n"
+                    "      flex-wrap: wrap;\n"
+                    "      transition: background-color 0.3s ease, color 0.3s ease;\n"
+                    "    }\n"
+                    "    .bot-header h2 {\n"
+                    "      color: var(--header-text);\n"
+                    "      margin: 0;\n"
+                    "      word-break: break-word;\n"
+                    "      transition: color 0.3s ease;\n"
+                    "    }\n"
+                    "    .bot-body {\n"
+                    "      background: var(--card-bg);\n"
+                    "      padding: 20px;\n"
+                    "      transition: background-color 0.3s ease;\n"
+                    "    }\n"
+                    "    .stats-table {\n"
+                    "      width: 100%;\n"
+                    "      border-collapse: collapse;\n"
+                    "      margin-bottom: 15px;\n"
+                    "      overflow-x: auto;\n"
+                    "      display: block;\n"
+                    "    }\n"
+                    "    .stats-table thead, .stats-table tbody, .stats-table tr {\n"
+                    "      display: table;\n"
+                    "      width: 100%;\n"
+                    "      table-layout: fixed;\n"
+                    "    }\n"
+                    "    .stats-table th, .stats-table td {\n"
+                    "      padding: 10px;\n"
+                    "      text-align: left;\n"
+                    "      border-bottom: 1px solid var(--border);\n"
+                    "      word-break: break-word;\n"
+                    "      transition: border-color 0.3s ease, color 0.3s ease;\n"
+                    "    }\n"
+                    "    .stats-table th {\n"
+                    "      color: var(--secondary);\n"
+                    "      font-weight: 500;\n"
+                    "    }\n"
+                    "    .stats-table td:not(:first-child) {\n"
+                    "      text-align: center;\n"
+                    "    }\n"
+                    "    .stats-table th:not(:first-child) {\n"
+                    "      text-align: center;\n"
+                    "    }\n"
+                    "    .stats-table tr:last-child td {\n"
+                    "      border-bottom: none;\n"
+                    "    }\n"
+                    "    .theme-switch {\n"
+                    "      position: fixed;\n"
+                    "      top: 20px;\n"
+                    "      right: 20px;\n"
+                    "      width: 40px;\n"
+                    "      height: 40px;\n"
+                    "      border-radius: 50%;\n"
+                    "      background-color: var(--primary);\n"
+                    "      color: white;\n"
+                    "      display: flex;\n"
+                    "      align-items: center;\n"
+                    "      justify-content: center;\n"
+                    "      cursor: pointer;\n"
+                    "      box-shadow: var(--box-shadow);\n"
+                    "      z-index: 100;\n"
+                    "      transition: background-color 0.3s ease, box-shadow 0.3s ease;\n"
+                    "    }\n"
+                    "    .theme-switch i {\n"
+                    "      font-size: 20px;\n"
+                    "    }\n"
+                    "    .theme-menu {\n"
+                    "      position: fixed;\n"
+                    "      top: 70px;\n"
+                    "      right: 20px;\n"
+                    "      background-color: var(--card-bg);\n"
+                    "      border-radius: 10px;\n"
+                    "      box-shadow: var(--box-shadow);\n"
+                    "      padding: 10px 0;\n"
+                    "      z-index: 99;\n"
+                    "      display: none;\n"
+                    "      transition: background-color 0.3s ease, box-shadow 0.3s ease;\n"
+                    "    }\n"
+                    "    .theme-menu.visible {\n"
+                    "      display: block;\n"
+                    "    }\n"
+                    "    .theme-menu-item {\n"
+                    "      padding: 8px 15px;\n"
+                    "      cursor: pointer;\n"
+                    "      white-space: nowrap;\n"
+                    "      display: flex;\n"
+                    "      align-items: center;\n"
+                    "      transition: background-color 0.2s;\n"
+                    "    }\n"
+                    "    .theme-menu-item:hover {\n"
+                    "      background-color: var(--bg-light);\n"
+                    "    }\n"
+                    "    .theme-menu-item.active {\n"
+                    "      color: var(--primary);\n"
+                    "      font-weight: bold;\n"
+                    "    }\n"
+                    "    .theme-menu-item i {\n"
+                    "      margin-right: 8px;\n"
+                    "      font-size: 18px;\n"
+                    "    }\n"
+                    "    @media screen and (max-width: 768px) {\n"
+                    "      .stats-row {\n"
+                    "        grid-template-columns: 1fr;\n"
+                    "      }\n"
+                    "      .content-wrapper {\n"
+                    "        padding: 0 5px;\n"
+                    "      }\n"
+                    "      body {\n"
+                    "        padding: 10px;\n"
+                    "      }\n"
+                    "      .bot-body {\n"
+                    "        padding: 15px 10px;\n"
+                    "      }\n"
+                    "    }\n"
+                    "    @media screen and (max-width: 480px) {\n"
+                    "      .stat-row {\n"
+                    "        flex-direction: column;\n"
+                    "        align-items: flex-start;\n"
+                    "      }\n"
+                    "      .stat-value {\n"
+                    "        text-align: left;\n"
+                    "        margin-top: 5px;\n"
+                    "        width: 100%;\n"
+                    "      }\n"
+                    "      .theme-switch {\n"
+                    "        top: 10px;\n"
+                    "        right: 10px;\n"
+                    "      }\n"
+                    "      .theme-menu {\n"
+                    "        top: 60px;\n"
+                    "        right: 10px;\n"
+                    "      }\n"
+                    "      h1 {\n"
+                    "        font-size: 1.5em;\n"
+                    "        margin-top: 30px;\n"
+                    "      }\n"
+                    "    }\n"
+                    "  </style>\n"
+                    "  <link href=\"https://fonts.googleapis.com/icon?family=Material+Icons\" rel=\"stylesheet\">\n"
+                    "</head>\n"
+                    "<body>\n"
+                    "<div class=\"theme-switch\" id=\"themeSwitch\">\n"
+                    "  <i class=\"material-icons\" id=\"themeIcon\">settings</i>\n"
+                    "</div>\n"
+                    "<div class=\"theme-menu\" id=\"themeMenu\">\n"
+                    "  <div class=\"theme-menu-item\" data-theme=\"light\">\n"
+                    "    <i class=\"material-icons\">light_mode</i> Светлая тема\n"
+                    "  </div>\n"
+                    "  <div class=\"theme-menu-item\" data-theme=\"dark\">\n"
+                    "    <i class=\"material-icons\">dark_mode</i> Темная тема\n"
+                    "  </div>\n"
+                    "  <div class=\"theme-menu-item\" data-theme=\"system\">\n"
+                    "    <i class=\"material-icons\">settings_brightness</i> Системная тема\n"
+                    "  </div>\n"
+                    "</div>\n"
+                    "<div class=\"content-wrapper\">\n"
+                    "  <h1>Telegram Bot API Server Statistics</h1>\n";
+  
+  if (stats.bot_count != 0) {
+    html += "  <div class='stats-container'>\n";
+    
+    html += "    <div class='stats-row'>\n";
+    
+    html += "      <div class='stats-box'>\n";
+    html += "        <h2>General Info</h2>\n";
+    html += "        <div class='stat-row'><span class='stat-label'>Uptime:</span> <span class='stat-value'>" + 
+            std::to_string(static_cast<int>(stats.uptime)) + " seconds</span></div>\n";
+    html += "        <div class='stat-row'><span class='stat-label'>Bot count:</span> <span class='stat-value'>" + 
+            std::to_string(stats.bot_count) + "</span></div>\n";
+    html += "        <div class='stat-row'><span class='stat-label'>Active bot count:</span> <span class='stat-value'>" + 
+            std::to_string(stats.active_bot_count) + "</span></div>\n";
+    html += "        <div class='stat-row'><span class='stat-label'>Active requests:</span> <span class='stat-value'>" + 
+            std::to_string(stats.active_requests) + "</span></div>\n";
+    html += "        <div class='stat-row'><span class='stat-label'>Active webhook connections:</span> <span class='stat-value'>" + 
+            std::to_string(stats.active_webhook_connections) + "</span></div>\n";
+    html += "      </div>\n";
+    
+    if (stats.memory.resident_size > 0) {
+      html += "      <div class='stats-box'>\n";
+      html += "        <h2>Memory Usage</h2>\n";
+      
+      html += "        <div class='stat-row'><span class='stat-label'>RSS:</span> <span class='stat-value'>" + 
+              format_size(stats.memory.resident_size) + "</span></div>\n";
+              
+      html += "        <div class='stat-row'><span class='stat-label'>VM:</span> <span class='stat-value'>" + 
+              format_size(stats.memory.virtual_size) + "</span></div>\n";
+              
+      html += "        <div class='stat-row'><span class='stat-label'>RSS Peak:</span> <span class='stat-value'>" + 
+              format_size(stats.memory.resident_size_peak) + "</span></div>\n";
+              
+      html += "        <div class='stat-row'><span class='stat-label'>VM Peak:</span> <span class='stat-value'>" + 
+              format_size(stats.memory.virtual_size_peak) + "</span></div>\n";
+              
+      html += "        <div class='stat-row'><span class='stat-label'>Buffer memory:</span> <span class='stat-value'>" + 
+              format_size(stats.buffer_memory) + "</span></div>\n";
+      html += "      </div>\n";
+    }
+    
+    html += "    </div>\n";
+    
+    if (!stats.cpu_stats.empty()) {
+      html += "    <div class='stats-row'>\n";
+      html += "      <div class='stats-box stats-row-wide'>\n";
+      html += "        <h2>CPU Statistics</h2>\n";
+      html += "        <div class='table-container' style='overflow-x: auto;'>\n";
+      html += "        <table class='stats-table'>\n";
+      html += "          <thead>\n";
+      html += "            <tr>\n";
+      html += "              <th>Metric</th>\n";
+      html += "              <th>All Time</th>\n";
+      html += "              <th>5 Sec</th>\n";
+      html += "              <th>1 Min</th>\n";
+      html += "              <th>1 Hour</th>\n";
+      html += "            </tr>\n";
+      html += "          </thead>\n";
+      html += "          <tbody>\n";
+      
+      for (const auto& stat : stats.cpu_stats) {
+        td::string label = stat.key_;
+        if (label == "total_cpu") {
+          label = "Total CPU";
+        } else if (label == "user_cpu") {
+          label = "User CPU";
+        } else if (label == "system_cpu") {
+          label = "System CPU";
+        }
+        
+        td::string value_str = stat.value_;
+        td::vector<td::string> values;
+        td::Parser parser(value_str);
+        while (!parser.empty()) {
+          auto value = parser.read_word();
+          if (!value.empty()) {
+            values.push_back(value.str());
+          }
+        }
+        
+        html += "            <tr>\n";
+        html += "              <td>" + label + "</td>\n";
+        for (size_t i = 0; i < values.size() && i < 4; i++) {
+          html += "              <td>" + values[i] + "</td>\n";
+        }
+
+        for (size_t i = values.size(); i < 4; i++) {
+          html += "              <td>-</td>\n";
+        }
+        
+        html += "            </tr>\n";
+      }
+      
+      html += "          </tbody>\n";
+      html += "        </table>\n";
+      html += "        </div>\n";
+      html += "      </div>\n";
+      html += "    </div>\n";
+    }
+    
+    html += "  </div>\n";
+  }
+  
+  if (!stats.bots.empty()) {
+    html += "  <div class='bot-container'>\n";
+    html += "    <h1>Bot Statistics</h1>\n";
+    
+    for (const auto& bot : stats.bots) {
+      html += "    <div class='bot-card'>\n";
+      html += "      <div class='bot-header'>\n";
+      html += "        <h2>" + (bot.username.empty() ? "Bot ID:" + std::to_string(bot.id) : "Bot @" + bot.username) + "</h2>\n";
+      html += "      </div>\n";
+      html += "      <div class='bot-body'>\n";
+      html += "        <div class='stats-container'>\n";
+      
+      html += "          <div class='stats-row'>\n";
+      
+      html += "            <div class='stats-box'>\n";
+      html += "              <h3>Bot Info</h3>\n";
+      html += "              <div class='stat-row'>\n";
+      html += "                <span class='stat-label'>ID:</span>\n";
+      html += "                <span class='stat-value'>\n";
+      html += "                  <span class='copyable' onclick='copyToClipboard(\"" + std::to_string(bot.id) + "\", event)'>" + 
+              std::to_string(bot.id) + "</span>\n";
+      html += "                </span>\n";
+      html += "              </div>\n";
+      
+      if (!bot.username.empty()) {
+        html += "              <div class='stat-row'>\n";
+        html += "                <span class='stat-label'>Username:</span>\n";
+        html += "                <span class='stat-value'>\n";
+        html += "                  <span class='copyable' onclick='copyToClipboard(\"@" + bot.username + "\", event)'>" + 
+                "@" + bot.username + "</span>\n";
+        html += "                </span>\n";
+        html += "              </div>\n";
+      }
+      
+      html += "              <div class='stat-row'><span class='stat-label'>Uptime:</span> <span class='stat-value'>" + 
+              std::to_string(static_cast<int>(bot.uptime)) + " seconds</span></div>\n";
+      
+      if (bot.token.size() > 10) {
+        td::string masked_token = bot.token.substr(0, 6) + "..." + 
+                                  bot.token.substr(bot.token.size() - 4);
+        html += "              <div class='stat-row'><span class='stat-label'>Token:</span> <span class='stat-value'>" + 
+                masked_token + "</span></div>\n";
+      }
+      
+      html += "            </div>\n";
+      
+      html += "            <div class='stats-box'>\n";
+      html += "              <h3>Updates</h3>\n";
+      html += "              <div class='stat-row'><span class='stat-label'>Head update ID:</span> <span class='stat-value'>" + 
+              std::to_string(bot.head_update_id) + "</span></div>\n";
+      
+      if (bot.pending_update_count != 0) {
+        html += "              <div class='stat-row'><span class='stat-label'>Tail update ID:</span> <span class='stat-value'>" + 
+                std::to_string(bot.tail_update_id) + "</span></div>\n";
+        html += "              <div class='stat-row'><span class='stat-label'>Pending updates:</span> <span class='stat-value'>" + 
+                std::to_string(bot.pending_update_count) + "</span></div>\n";
+      }
+      
+      html += "            </div>\n";
+      html += "          </div>\n";
+
+      html += "          <div class='stats-row'>\n";
+      html += "            <div class='stats-box stats-row-wide'>\n";
+      html += "              <h3>Activity</h3>\n";
+      html += "              <div class='table-container' style='overflow-x: auto;'>\n";
+      html += "              <table class='stats-table'>\n";
+      html += "                <thead>\n";
+      html += "                  <tr>\n";
+      html += "                    <th>Metric</th>\n";
+      html += "                    <th>All Time</th>\n";
+      html += "                    <th>5 Sec</th>\n";
+      html += "                    <th>1 Min</th>\n";
+      html += "                    <th>1 Hour</th>\n";
+      html += "                  </tr>\n";
+      html += "                </thead>\n";
+      html += "                <tbody>\n";
+      
+      for (const auto& stat : bot.stats) {
+        if (stat.key_ == "update_count" || stat.key_ == "request_count") {
+          td::string value_str = stat.value_;
+          td::vector<td::string> values;
+          td::Parser parser(value_str);
+          while (!parser.empty()) {
+            auto value = parser.read_word();
+            if (!value.empty()) {
+              values.push_back(value.str());
+            }
+          }
+          
+          td::string label = stat.key_;
+          if (label == "update_count") {
+            label = "Updates";
+          } else if (label == "request_count") {
+            label = "Requests";
+          }
+          
+          html += "                  <tr>\n";
+          html += "                    <td>" + label + "/sec</td>\n";
+          
+          for (size_t i = 0; i < values.size() && i < 4; i++) {
+            html += "                    <td>" + values[i] + "</td>\n";
+          }
+          
+          for (size_t i = values.size(); i < 4; i++) {
+            html += "                    <td>-</td>\n";
+          }
+          
+          html += "                  </tr>\n";
+        }
+      }
+      
+      html += "                </tbody>\n";
+      html += "              </table>\n";
+      html += "              </div>\n";
+      
+      if (bot.active_request_count != 0) {
+        html += "              <div class='stat-row'><span class='stat-label'>Active requests:</span> <span class='stat-value'>" + 
+                std::to_string(bot.active_request_count) + "</span></div>\n";
+      }
+      
+      if (bot.active_file_upload_count != 0) {
+        html += "              <div class='stat-row'><span class='stat-label'>Active uploads:</span> <span class='stat-value'>" + 
+                std::to_string(bot.active_file_upload_count) + "</span></div>\n";
+      }
+      
+      if (bot.active_file_upload_bytes != 0) {
+        html += "              <div class='stat-row'><span class='stat-label'>Upload bytes:</span> <span class='stat-value'>" + 
+                format_size(bot.active_file_upload_bytes) + "</span></div>\n";
+      }
+      
+      html += "            </div>\n";
+      html += "          </div>\n";
+      
+      if (!bot.webhook.empty()) {
+        html += "          <div class='stats-row'>\n";
+        html += "            <div class='stats-box stats-row-wide'>\n";
+        html += "              <h3>Webhook</h3>\n";
+        html += "              <div class='stat-row'><span class='stat-label'>URL:</span> <span class='stat-value' style='word-break: break-all;'>" + 
+                bot.webhook + "</span></div>\n";
+        
+        if (bot.has_webhook_certificate) {
+          html += "              <div class='stat-row'><span class='stat-label'>Certificate:</span> <span class='stat-value'>Custom</span></div>\n";
+        }
+        
+        if (bot.webhook_max_connections != 0) {
+          html += "              <div class='stat-row'><span class='stat-label'>Max connections:</span> <span class='stat-value'>" + 
+                  std::to_string(bot.webhook_max_connections) + "</span></div>\n";
+        }
+        
+        html += "            </div>\n";
+        html += "          </div>\n";
+      }
+      
+      html += "        </div>\n";
+      html += "      </div>\n";
+      html += "    </div>\n";
+    }
+    
+    html += "  </div>\n";
+  }
+  
+  html += "<script>\n";
+  html += "function copyToClipboard(text, event) {\n";
+  html += "  navigator.clipboard.writeText(text)\n";
+  html += "    .then(() => {\n";
+  html += "      const el = event.currentTarget;\n";
+  html += "      const originalText = el.textContent;\n";
+  html += "      const originalBg = el.style.backgroundColor;\n";
+  html += "      \n";
+  html += "      el.textContent = 'Copied!';\n";
+  html += "      el.style.backgroundColor = 'var(--copyable-success)';\n";
+  html += "      \n";
+  html += "      setTimeout(() => {\n";
+  html += "        el.textContent = originalText;\n";
+  html += "        el.style.backgroundColor = originalBg;\n";
+  html += "      }, 1000);\n";
+  html += "    })\n";
+  html += "    .catch(err => {\n";
+  html += "      console.error('Failed to copy: ', err);\n";
+  html += "    });\n";
+  html += "}\n";
+  html += "\n";
+  html += "function initTheme() {\n";
+  html += "  const themeSwitch = document.getElementById('themeSwitch');\n";
+  html += "  const themeMenu = document.getElementById('themeMenu');\n";
+  html += "  const themeMenuItems = document.querySelectorAll('.theme-menu-item');\n";
+  html += "  const html = document.documentElement;\n";
+  html += "  \n";
+  html += "  document.addEventListener('click', function(event) {\n";
+  html += "    if (!themeSwitch.contains(event.target) && !themeMenu.contains(event.target)) {\n";
+  html += "      themeMenu.classList.remove('visible');\n";
+  html += "    }\n";
+  html += "  });\n";
+  html += "  \n";
+  html += "  themeSwitch.addEventListener('click', function(event) {\n";
+  html += "    event.stopPropagation();\n";
+  html += "    themeMenu.classList.toggle('visible');\n";
+  html += "  });\n";
+  html += "  \n";
+  html += "  function applyTheme() {\n";
+  html += "    const storedTheme = localStorage.getItem('theme') || 'system';\n";
+  html += "    \n";
+  html += "    themeMenuItems.forEach(item => {\n";
+  html += "      if (item.dataset.theme === storedTheme) {\n";
+  html += "        item.classList.add('active');\n";
+  html += "      } else {\n";
+  html += "        item.classList.remove('active');\n";
+  html += "      }\n";
+  html += "    });\n";
+  html += "    \n";
+  html += "    if (storedTheme === 'dark') {\n";
+  html += "      document.body.classList.add('dark-mode');\n";
+  html += "      html.classList.remove('system-theme');\n";
+  html += "    } else if (storedTheme === 'light') {\n";
+  html += "      document.body.classList.remove('dark-mode');\n";
+  html += "      html.classList.remove('system-theme');\n";
+  html += "    } else if (storedTheme === 'system') {\n";
+  html += "      html.classList.add('system-theme');\n";
+  html += "      const prefersDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches;\n";
+  html += "      if (prefersDarkMode) {\n";
+  html += "        document.body.classList.add('dark-mode');\n";
+  html += "      } else {\n";
+  html += "        document.body.classList.remove('dark-mode');\n";
+  html += "      }\n";
+  html += "    }\n";
+  html += "  }\n";
+  html += "  \n";
+  html += "  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function(e) {\n";
+  html += "    if (localStorage.getItem('theme') === 'system') {\n";
+  html += "      if (e.matches) {\n";
+  html += "        document.body.classList.add('dark-mode');\n";
+  html += "      } else {\n";
+  html += "        document.body.classList.remove('dark-mode');\n";
+  html += "      }\n";
+  html += "    }\n";
+  html += "  });\n";
+  html += "  \n";
+  html += "  themeMenuItems.forEach(item => {\n";
+  html += "    item.addEventListener('click', function() {\n";
+  html += "      const selectedTheme = this.dataset.theme;\n";
+  html += "      localStorage.setItem('theme', selectedTheme);\n";
+  html += "      themeMenu.classList.remove('visible');\n";
+  html += "      applyTheme();\n";
+  html += "    });\n";
+  html += "  });\n";
+  html += "  \n";
+  html += "  applyTheme();\n";
+  html += "}\n";
+  html += "\n";
+  html += "if (document.readyState === 'loading') {\n";
+  html += "  document.addEventListener('DOMContentLoaded', initTheme);\n";
+  html += "} else {\n";
+  html += "  initTheme();\n";
+  html += "}\n";
+  html += "</script>\n";
+  
+  html += "</div>\n</body>\n</html>";
+  
+  return td::BufferSlice(html);
 }
 
 td::int64 ClientManager::get_tqueue_id(td::int64 user_id, bool is_test_dc) {
@@ -589,7 +1378,5 @@ void ClientManager::finish_close() {
   }
   stop();
 }
-
-constexpr double ClientManager::WATCHDOG_TIMEOUT;
 
 }  // namespace telegram_bot_api

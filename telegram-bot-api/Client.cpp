@@ -8433,8 +8433,18 @@ td_api::object_ptr<td_api::messageSendOptions> Client::get_message_send_options(
                                                                                 bool protect_content,
                                                                                 bool allow_paid_broadcast,
                                                                                 int64 effect_id) {
-  return make_object<td_api::messageSendOptions>(disable_notification, false, protect_content, allow_paid_broadcast,
-                                                 false, nullptr, effect_id, 0, false);
+  return make_object<td_api::messageSendOptions>(
+    disable_notification,
+    false,
+    protect_content,
+    allow_paid_broadcast,
+    0,
+    false,
+    nullptr,
+    effect_id,
+    0,
+    false
+);
 }
 
 td::Result<td_api::object_ptr<td_api::inlineQueryResultsButton>> Client::get_inline_query_results_button(
