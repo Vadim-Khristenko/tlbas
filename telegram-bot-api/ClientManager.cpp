@@ -238,7 +238,7 @@ void ClientManager::get_stats(td::Promise<td::BufferSlice> promise,
   } else if (format_type == 1) {
     promise.set_value(format_stats_as_html(stats_data));
   } else if (format_type == 2) {
-    promise.set_error(td::Status::Error(400, "Bad Request: JSON format is not supported yet"));
+    promise.set_value(format_stats_as_json(stats_data));
   } else {
     promise.set_error(td::Status::Error(400, "Bad Request: invalid format specified"));
   }
@@ -337,7 +337,8 @@ td::BufferSlice ClientManager::format_stats_as_text(const ServerStats& stats) {
     sb << '\n';
     sb << "id\t" << bot.id << '\n';
     sb << "uptime\t" << bot.uptime << '\n';
-    sb << "token\t" << bot.token << '\n';
+    td::string masked_token = bot.token.substr(0, 6) + "..." + bot.token.substr(bot.token.size() - 4);
+    sb << "token\t" << masked_token << '\n';
     sb << "username\t" << bot.username << '\n';
     
     if (bot.active_request_count != 0) {
@@ -380,7 +381,166 @@ td::BufferSlice ClientManager::format_stats_as_text(const ServerStats& stats) {
   return td::BufferSlice(sb.as_cslice());
 }
 
-td::string format_size(td::uint64 size) {
+td::BufferSlice ClientManager::format_stats_as_json(const ServerStats& stats) {
+  td::string json = "{";
+  json += "\"uptime\":" + td::to_string(stats.uptime) + ",";
+  json += "\"bot_count\":" + td::to_string(stats.bot_count) + ",";
+  json += "\"active_bot_count\":" + td::to_string(stats.active_bot_count) + ",";
+  json += "\"memory\":{";
+  json += "\"rss\":" + td::to_string(stats.memory.resident_size) + ",";
+  json += "\"vm\":" + td::to_string(stats.memory.virtual_size) + ",";
+  json += "\"rss_peak\":" + td::to_string(stats.memory.resident_size_peak) + ",";
+  json += "\"vm_peak\":" + td::to_string(stats.memory.virtual_size_peak) + ",";
+  json += "\"buffer_memory\":" + td::to_string(stats.buffer_memory) + "},";
+
+  json += "\"cpu_stats\":{";
+  for (const auto& stat : stats.cpu_stats) {
+    td::string value_str = stat.value_;
+    td::vector<td::string> values;
+    td::Parser parser(value_str);
+    while (!parser.empty()) {
+      auto value = parser.read_word();
+        if (!value.empty()) {
+          values.push_back(value.str());
+        }
+      }
+    
+    td::string values_json = "";
+    for (size_t i = 0; i < values.size(); i++) {
+      values_json += "\"" + values[i] + "\"";
+      if (i < values.size() - 1) {
+        values_json += ",";
+      }
+    }
+    
+    json += "\"" + escape_json_string(stat.key_) + "\":[" + values_json + "]";
+    if (&stat != &stats.cpu_stats.back()) {
+      json += ",";
+    }
+  }
+  json += "}";
+
+  json += ",\"active_webhook_connections\":" + td::to_string(stats.active_webhook_connections) + ",";
+  json += "\"active_requests\":" + td::to_string(stats.active_requests) + ",";
+  json += "\"active_network_queries\":" + td::to_string(stats.active_network_queries) + ",";
+
+  json += "\"server_stats\":{";
+  for (const auto& stat : stats.server_stats) {
+    td::string value_str = stat.value_;
+    td::vector<td::string> values;
+    td::Parser parser(value_str);
+    while (!parser.empty()) {
+      auto value = parser.read_word();
+        if (!value.empty()) {
+          values.push_back(value.str());
+        }
+      }
+    
+    td::string values_json = "";
+    for (size_t i = 0; i < values.size(); i++) {
+      values_json += values[i];
+      if (i < values.size() - 1) {
+        values_json += ",";
+      }
+    }
+    
+    json += "\"" + escape_json_string(stat.key_) + "\":[" + values_json + "]";
+    if (&stat != &stats.server_stats.back()) {
+      json += ",";
+    }
+  }
+  json += "}";
+
+  if (!stats.bots.empty()) {
+    json += ",\"bots\":[";
+    for (const auto& bot : stats.bots) {
+      json += "{";
+      json += "\"id\":" + td::to_string(bot.id) + ",";
+      json += "\"uptime\":" + td::to_string(bot.uptime) + ",";
+      td::string masked_token = bot.token.substr(0, 6) + "..." + bot.token.substr(bot.token.size() - 4);
+      json += "\"token\":\"" + escape_json_string(masked_token) + "\",";
+      json += "\"username\":\"" + escape_json_string(bot.username) + "\",";
+      json += "\"active_request_count\":" + td::to_string(bot.active_request_count) + ",";
+      json += "\"active_file_upload_bytes\":" + td::to_string(bot.active_file_upload_bytes) + ",";
+      json += "\"active_file_upload_count\":" + td::to_string(bot.active_file_upload_count) + ",";
+      if (!bot.webhook.empty()) {
+        json += "\"webhook\":\"" + escape_json_string(bot.webhook) + "\",";
+        json += "\"has_webhook_certificate\":" + std::string(bot.has_webhook_certificate ? "true" : "false") + ",";
+        json += "\"webhook_max_connections\":" + td::to_string(bot.webhook_max_connections) + ",";
+      }
+      json += "\"head_update_id\":" + td::to_string(bot.head_update_id) + ",";
+      json += "\"tail_update_id\":" + td::to_string(bot.tail_update_id) + ",";
+      json += "\"pending_update_count\":" + td::to_string(bot.pending_update_count) + ",";
+      
+      if (!bot.stats.empty()) {
+        json += "\"stats\":{";
+        for (const auto& stat : bot.stats) {
+          td::string value_str = stat.value_;
+          td::vector<td::string> values;
+          td::Parser parser(value_str);
+          while (!parser.empty()) {
+            auto value = parser.read_word();
+              if (!value.empty()) {
+                values.push_back(value.str());
+              }
+            }
+          
+          td::string values_json = "";
+          for (size_t i = 0; i < values.size(); i++) {
+            values_json += values[i];
+            if (i < values.size() - 1) {
+              values_json += ",";
+            }
+          }
+          
+          json += "\"" + escape_json_string(stat.key_) + "\":[" + values_json + "]";
+          if (&stat != &bot.stats.back()) {
+            json += ",";
+          }
+        }
+        json += "}";
+      }
+      json += "}";
+      if (&bot != &stats.bots.back()) {
+        json += ",";
+      }
+    }
+    json += "]";
+  }
+  json += "}";
+  
+  return td::BufferSlice(json);
+}
+
+td::string ClientManager::escape_json_string(const td::string& str) {
+  td::string result;
+  result.reserve(str.size() * 2);
+  
+  for (char c : str) {
+    switch (c) {
+      case '\"': result += "\\\""; break;
+      case '\\': result += "\\\\"; break;
+      case '/': result += "\\/"; break;
+      case '\b': result += "\\b"; break;
+      case '\f': result += "\\f"; break;
+      case '\n': result += "\\n"; break;
+      case '\r': result += "\\r"; break;
+      case '\t': result += "\\t"; break;
+      default:
+        if (c < 0x20) {
+          result += "\\u00";
+          result += td::format::hex_digit((c >> 4) & 0xf);
+          result += td::format::hex_digit(c & 0xf);
+        } else {
+          result += c;
+        }
+    }
+  }
+  
+  return result;
+}
+
+td::string ClientManager::format_size(td::uint64 size) {
   size_t buf_size = 1 << 6;
   auto buf = td::StackAllocator::alloc(buf_size);
   td::StringBuilder sb(buf.as_slice());
@@ -727,107 +887,105 @@ td::BufferSlice ClientManager::format_stats_as_html(const ServerStats& stats) {
                     "<div class=\"content-wrapper\">\n"
                     "  <h1>Telegram Bot API Server Statistics</h1>\n";
   
-  if (stats.bot_count != 0) {
-    html += "  <div class='stats-container'>\n";
+  html += "  <div class='stats-container'>\n";
     
-    html += "    <div class='stats-row'>\n";
+  html += "    <div class='stats-row'>\n";
     
+  html += "      <div class='stats-box'>\n";
+  html += "        <h2>General Info</h2>\n";
+  html += "        <div class='stat-row'><span class='stat-label'>Uptime:</span> <span class='stat-value'>" + 
+          std::to_string(static_cast<int>(stats.uptime)) + " seconds</span></div>\n";
+  html += "        <div class='stat-row'><span class='stat-label'>Bot count:</span> <span class='stat-value'>" + 
+          std::to_string(stats.bot_count) + "</span></div>\n";
+  html += "        <div class='stat-row'><span class='stat-label'>Active bot count:</span> <span class='stat-value'>" + 
+          std::to_string(stats.active_bot_count) + "</span></div>\n";
+  html += "        <div class='stat-row'><span class='stat-label'>Active requests:</span> <span class='stat-value'>" + 
+          std::to_string(stats.active_requests) + "</span></div>\n";
+  html += "        <div class='stat-row'><span class='stat-label'>Active webhook connections:</span> <span class='stat-value'>" + 
+          std::to_string(stats.active_webhook_connections) + "</span></div>\n";
+  html += "      </div>\n";
+    
+  if (stats.memory.resident_size > 0) {
     html += "      <div class='stats-box'>\n";
-    html += "        <h2>General Info</h2>\n";
-    html += "        <div class='stat-row'><span class='stat-label'>Uptime:</span> <span class='stat-value'>" + 
-            std::to_string(static_cast<int>(stats.uptime)) + " seconds</span></div>\n";
-    html += "        <div class='stat-row'><span class='stat-label'>Bot count:</span> <span class='stat-value'>" + 
-            std::to_string(stats.bot_count) + "</span></div>\n";
-    html += "        <div class='stat-row'><span class='stat-label'>Active bot count:</span> <span class='stat-value'>" + 
-            std::to_string(stats.active_bot_count) + "</span></div>\n";
-    html += "        <div class='stat-row'><span class='stat-label'>Active requests:</span> <span class='stat-value'>" + 
-            std::to_string(stats.active_requests) + "</span></div>\n";
-    html += "        <div class='stat-row'><span class='stat-label'>Active webhook connections:</span> <span class='stat-value'>" + 
-            std::to_string(stats.active_webhook_connections) + "</span></div>\n";
+    html += "        <h2>Memory Usage</h2>\n";
+      
+    html += "        <div class='stat-row'><span class='stat-label'>RSS:</span> <span class='stat-value'>" + 
+            format_size(stats.memory.resident_size) + "</span></div>\n";
+              
+    html += "        <div class='stat-row'><span class='stat-label'>VM:</span> <span class='stat-value'>" + 
+            format_size(stats.memory.virtual_size) + "</span></div>\n";
+              
+    html += "        <div class='stat-row'><span class='stat-label'>RSS Peak:</span> <span class='stat-value'>" + 
+            format_size(stats.memory.resident_size_peak) + "</span></div>\n";
+              
+    html += "        <div class='stat-row'><span class='stat-label'>VM Peak:</span> <span class='stat-value'>" + 
+            format_size(stats.memory.virtual_size_peak) + "</span></div>\n";
+              
+    html += "        <div class='stat-row'><span class='stat-label'>Buffer memory:</span> <span class='stat-value'>" + 
+            format_size(stats.buffer_memory) + "</span></div>\n";
     html += "      </div>\n";
-    
-    if (stats.memory.resident_size > 0) {
-      html += "      <div class='stats-box'>\n";
-      html += "        <h2>Memory Usage</h2>\n";
-      
-      html += "        <div class='stat-row'><span class='stat-label'>RSS:</span> <span class='stat-value'>" + 
-              format_size(stats.memory.resident_size) + "</span></div>\n";
-              
-      html += "        <div class='stat-row'><span class='stat-label'>VM:</span> <span class='stat-value'>" + 
-              format_size(stats.memory.virtual_size) + "</span></div>\n";
-              
-      html += "        <div class='stat-row'><span class='stat-label'>RSS Peak:</span> <span class='stat-value'>" + 
-              format_size(stats.memory.resident_size_peak) + "</span></div>\n";
-              
-      html += "        <div class='stat-row'><span class='stat-label'>VM Peak:</span> <span class='stat-value'>" + 
-              format_size(stats.memory.virtual_size_peak) + "</span></div>\n";
-              
-      html += "        <div class='stat-row'><span class='stat-label'>Buffer memory:</span> <span class='stat-value'>" + 
-              format_size(stats.buffer_memory) + "</span></div>\n";
-      html += "      </div>\n";
-    }
-    
-    html += "    </div>\n";
-    
-    if (!stats.cpu_stats.empty()) {
-      html += "    <div class='stats-row'>\n";
-      html += "      <div class='stats-box stats-row-wide'>\n";
-      html += "        <h2>CPU Statistics</h2>\n";
-      html += "        <div class='table-container' style='overflow-x: auto;'>\n";
-      html += "        <table class='stats-table'>\n";
-      html += "          <thead>\n";
-      html += "            <tr>\n";
-      html += "              <th>Metric</th>\n";
-      html += "              <th>All Time</th>\n";
-      html += "              <th>5 Sec</th>\n";
-      html += "              <th>1 Min</th>\n";
-      html += "              <th>1 Hour</th>\n";
-      html += "            </tr>\n";
-      html += "          </thead>\n";
-      html += "          <tbody>\n";
-      
-      for (const auto& stat : stats.cpu_stats) {
-        td::string label = stat.key_;
-        if (label == "total_cpu") {
-          label = "Total CPU";
-        } else if (label == "user_cpu") {
-          label = "User CPU";
-        } else if (label == "system_cpu") {
-          label = "System CPU";
-        }
-        
-        td::string value_str = stat.value_;
-        td::vector<td::string> values;
-        td::Parser parser(value_str);
-        while (!parser.empty()) {
-          auto value = parser.read_word();
-          if (!value.empty()) {
-            values.push_back(value.str());
-          }
-        }
-        
-        html += "            <tr>\n";
-        html += "              <td>" + label + "</td>\n";
-        for (size_t i = 0; i < values.size() && i < 4; i++) {
-          html += "              <td>" + values[i] + "</td>\n";
-        }
-
-        for (size_t i = values.size(); i < 4; i++) {
-          html += "              <td>-</td>\n";
-        }
-        
-        html += "            </tr>\n";
-      }
-      
-      html += "          </tbody>\n";
-      html += "        </table>\n";
-      html += "        </div>\n";
-      html += "      </div>\n";
-      html += "    </div>\n";
-    }
-    
-    html += "  </div>\n";
   }
+    
+  html += "    </div>\n";
+    
+  if (!stats.cpu_stats.empty()) {
+    html += "    <div class='stats-row'>\n";
+    html += "      <div class='stats-box stats-row-wide'>\n";
+    html += "        <h2>CPU Statistics</h2>\n";
+    html += "        <div class='table-container' style='overflow-x: auto;'>\n";
+    html += "        <table class='stats-table'>\n";
+    html += "          <thead>\n";
+    html += "            <tr>\n";
+    html += "              <th>Metric</th>\n";
+    html += "              <th>All Time</th>\n";
+    html += "              <th>5 Sec</th>\n";
+    html += "              <th>1 Min</th>\n";
+    html += "              <th>1 Hour</th>\n";
+    html += "            </tr>\n";
+    html += "          </thead>\n";
+    html += "          <tbody>\n";
+      
+    for (const auto& stat : stats.cpu_stats) {
+      td::string label = stat.key_;
+      if (label == "total_cpu") {
+        label = "Total CPU";
+      } else if (label == "user_cpu") {
+        label = "User CPU";
+      } else if (label == "system_cpu") {
+        label = "System CPU";
+      }
+        
+      td::string value_str = stat.value_;
+      td::vector<td::string> values;
+      td::Parser parser(value_str);
+      while (!parser.empty()) {
+        auto value = parser.read_word();
+        if (!value.empty()) {
+          values.push_back(value.str());
+        }
+      }
+        
+      html += "            <tr>\n";
+      html += "              <td>" + label + "</td>\n";
+      for (size_t i = 0; i < values.size() && i < 4; i++) {
+        html += "              <td>" + values[i] + "</td>\n";
+      }
+
+      for (size_t i = values.size(); i < 4; i++) {
+        html += "              <td>-</td>\n";
+      }
+        
+      html += "            </tr>\n";
+    }
+      
+    html += "          </tbody>\n";
+    html += "        </table>\n";
+    html += "        </div>\n";
+    html += "      </div>\n";
+    html += "    </div>\n";
+  }
+    
+  html += "  </div>\n";
   
   if (!stats.bots.empty()) {
     html += "  <div class='bot-container'>\n";

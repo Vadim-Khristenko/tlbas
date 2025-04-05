@@ -34,11 +34,13 @@ void HttpStatConnection::handle(td::unique_ptr<td::HttpQuery> http_query,
   }
   
   if (!format_type_str.empty()) {
-    if (format_type_str == "text" || format_type_str == "txt" || format_type_str == "plain") {
+    format_type_str = td::to_lower(td::Slice(format_type_str));
+    if (format_type_str == "text" || format_type_str == "txt" || format_type_str == "plain" ||
+        format_type_str == "0") {
       format_type = 0;
-    } else if (format_type_str == "html" || format_type_str == "web") {
+    } else if (format_type_str == "html" || format_type_str == "web" || format_type_str == "1") {
       format_type = 1;
-    } else if (format_type_str == "json") {
+    } else if (format_type_str == "json" || format_type_str == "2") {
       format_type = 2;
     } else {
       send_closure(connection_.release(), &td::HttpInboundConnection::write_error,

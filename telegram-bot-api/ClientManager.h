@@ -133,6 +133,9 @@ class ClientManager final : public td::Actor {
   ServerStats collect_stats_data(double now, td::Slice id_filter);
   td::BufferSlice format_stats_as_text(const ServerStats& stats);
   td::BufferSlice format_stats_as_html(const ServerStats& stats);
+  td::BufferSlice format_stats_as_json(const ServerStats& stats);
+  td::string escape_json_string(const td::string& str);
+  td::string format_size(td::uint64 size);
 
   void start_up() final;
   void raw_event(const td::Event::Raw &event) final;
