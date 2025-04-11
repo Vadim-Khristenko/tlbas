@@ -803,6 +803,7 @@ class Client final : public WebhookActor::Callback {
   td::Status process_ban_chat_member_query(PromisedQueryPtr &query);
   td::Status process_restrict_chat_member_query(PromisedQueryPtr &query);
   td::Status process_unban_chat_member_query(PromisedQueryPtr &query);
+  td::Status process_unrestrict_chat_member_query(PromisedQueryPtr &query);
   td::Status process_ban_chat_sender_chat_query(PromisedQueryPtr &query);
   td::Status process_unban_chat_sender_chat_query(PromisedQueryPtr &query);
   td::Status process_approve_chat_join_request_query(PromisedQueryPtr &query);

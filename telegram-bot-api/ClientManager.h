@@ -47,6 +47,7 @@ class ClientManager final : public td::Actor {
   void send(PromisedQueryPtr query);
 
   void get_stats(td::Promise<td::BufferSlice> promise, td::vector<std::pair<td::string, td::string>> args);
+  void get_stats(td::Promise<td::BufferSlice> promise, td::vector<std::pair<td::string, td::string>> args, int format_type);
 
   void close(td::Promise<td::Unit> &&promise);
 
@@ -76,7 +77,7 @@ class ClientManager final : public td::Actor {
   td::int64 tqueue_deleted_events_ = 0;
   td::int64 last_tqueue_deleted_events_ = 0;
 
-  static constexpr double WATCHDOG_TIMEOUT = 0.25;
+  static inline constexpr double WATCHDOG_TIMEOUT = 0.25;
 
   static td::int64 get_tqueue_id(td::int64 user_id, bool is_test_dc);
 
@@ -88,6 +89,53 @@ class ClientManager final : public td::Actor {
     td::vector<td::uint64> top_client_ids;
   };
   TopClients get_top_clients(std::size_t max_count, td::Slice token_filter);
+
+  struct ServerStats {
+    double uptime = 0;
+    size_t bot_count = 0;
+    size_t active_bot_count = 0;
+    
+    struct MemStats {
+      td::int64 resident_size = 0;
+      td::int64 virtual_size = 0;
+      td::int64 resident_size_peak = 0;
+      td::int64 virtual_size_peak = 0;
+    } memory;
+    
+    td::int64 buffer_memory = 0;
+    size_t active_webhook_connections = 0;
+    size_t active_requests = 0;
+    size_t active_network_queries = 0;
+    
+    td::vector<StatItem> cpu_stats;
+    td::vector<StatItem> server_stats;
+    
+    struct BotStats {
+      td::int64 id = 0;
+      double uptime = 0;
+      td::string token;
+      td::string username;
+      size_t active_request_count = 0;
+      size_t active_file_upload_bytes = 0;
+      size_t active_file_upload_count = 0;
+      td::string webhook;
+      bool has_webhook_certificate = false;
+      int webhook_max_connections = 0;
+      td::int64 head_update_id = 0;
+      td::int64 tail_update_id = 0;
+      td::int64 pending_update_count = 0;
+      td::vector<StatItem> stats;
+    };
+    
+    td::vector<BotStats> bots;
+  };
+  
+  ServerStats collect_stats_data(double now, td::Slice id_filter);
+  td::BufferSlice format_stats_as_text(const ServerStats& stats);
+  td::BufferSlice format_stats_as_html(const ServerStats& stats);
+  td::BufferSlice format_stats_as_json(const ServerStats& stats);
+  td::string escape_json_string(const td::string& str);
+  td::string format_size(td::uint64 size);
 
   void start_up() final;
   void raw_event(const td::Event::Raw &event) final;
