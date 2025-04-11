@@ -18,7 +18,6 @@ Table of Contents
 - `Installation <#installation>`_
 - `Dependencies <#dependencies>`_
 - `Usage <#usage>`_
-- `Building the Official Image vs. This Project <#building-the-official-image-vs-this-project>`_
 - `Documentation <#documentation>`_
 - `Moving a bot to a local server <#moving-a-bot-to-a-local-server>`_
 - `Moving a bot from one local server to another <#moving-a-bot-from-one-local-server-to-another>`_
@@ -27,10 +26,10 @@ Table of Contents
 Installation
 ------------
 
-The simplest way to build and install `Telegram Bot API server` is to use our `Telegram Bot API server build instructions generator <https://tdlib.github.io/telegram-bot-api/build.html>`_.
+The simplest way to build and install ``Telegram Bot API server`` is to use our `Telegram Bot API server build instructions generator <https://tdlib.github.io/telegram-bot-api/build.html>`_.
 If you do that, you'll only need to choose the target operating system to receive the complete build instructions.
 
-In general, you need to install all `Telegram Bot API server` dependencies_ and compile the source code using CMake:
+In general, you need to install all ``Telegram Bot API server`` dependencies_ and compile the source code using CMake:
 
 .. code-block:: bash
 
@@ -41,10 +40,25 @@ In general, you need to install all `Telegram Bot API server` dependencies_ and 
    cmake -DCMAKE_BUILD_TYPE=Release ..
    cmake --build . --target install
 
+..
+
+
+   To install **this project**, replace ``tdlib/telegram-bot-api`` with ``Vadim-Khristenko/tlbas`` in the cloning step of the instructions. Also replace all references to ``telegram-bot-api`` with ``tlbas``.
+   In general, you need to install all ``Telegram Bot API server`` dependencies_ and compile the source code using CMake:
+
+   .. code-block:: bash
+
+      git clone --recursive https://github.com/Vadim-Khristenko/tlbas.git
+      cd tlbas
+      mkdir build
+      cd build
+      cmake -DCMAKE_BUILD_TYPE=Release ..
+      cmake --build . --target install
+
 Dependencies
 ------------
 
-To build and run `Telegram Bot API server` you will need:
+To build and run ``Telegram Bot API server`` you will need:
 
 - OpenSSL
 - zlib
@@ -75,63 +89,6 @@ To enable Bot API features not available at ``https://api.telegram.org``, specif
 The Telegram Bot API server accepts only HTTP requests, so a TLS termination proxy needs to be used to handle remote HTTPS requests.
 
 By default the Telegram Bot API server is launched on the port 8081, which can be changed using the option ``--http-port``.
-
-
-Building the Official Image vs. This Project
---------------------------------------------
-
-
-Building the Official Telegram Bot API Image
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-To build the official Telegram Bot API server image, follow these steps:
-
-1. Clone the official repository:
-
-   .. code-block:: bash
-
-      git clone --recursive https://github.com/tdlib/telegram-bot-api.git
-      cd telegram-bot-api
-
-2. Build the Docker image:
-
-   .. code-block:: bash
-
-      docker build -t telegram-bot-api .
-
-3. Run the image:
-
-   .. code-block:: bash
-
-      docker run --name=telegram-bot-api -p 8081:8081 telegram-bot-api
-
-Building the Image for This Project
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-You can follow the **same instructions** as above to build and run the Docker image for this project. The only difference is that you need to clone this repository instead of the official one.
-
-1. Clone this repository:
-
-   .. code-block:: bash
-
-      git clone --recursive https://github.com/Vadim-Khristenko/tlbas.git
-      cd tlbas
-
-2. Build the Docker image:
-
-   .. code-block:: bash
-
-      docker build -t tlbas .
-
-3. Run the image:
-
-   .. code-block:: bash
-
-      docker run --name=tlbas -p 8081:8081 tlbas
-
-.. note::
-
-   Remember to replace `tdlib/telegram-bot-api` with `Vadim-Khristenko/tlbas` wherever applicable in the instructions.
 
 Documentation
 -------------
