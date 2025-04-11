@@ -12403,6 +12403,38 @@ td::Status Client::process_unban_chat_member_query(PromisedQueryPtr &query) {
   return td::Status::OK();
 }
 
+td::Status Client::process_unrestrict_chat_member_query(PromisedQueryPtr &query) {
+  return td::Error(400, "Bad Request: method is not implemented");
+  auto chat_id = query->arg("chat_id");
+  TRY_RESULT(user_id, get_user_id(query.get()));
+  auto only_if_restricted = to_bool(query->arg("only_if_restricted"));
+  auto allow_legacy = true;
+
+  check_chat(chat_id, AccessRights::Write, std::move(query),
+             [this, user_id, only_if_restricted, allow_legacy](int64 chat_id, PromisedQueryPtr query) {
+               if (get_chat_type(chat_id) != ChatType::Supergroup) {
+                 return fail_query(400, "Bad Request: method is available only for supergroups", std::move(query));
+               }
+
+               if (only_if_restricted) {
+                 get_chat_member(
+                     chat_id, user_id, std::move(query),
+                     [this, chat_id, user_id](object_ptr<td_api::chatMember> &&chat_member, PromisedQueryPtr query) {
+                       if (chat_member->status_->get_id() != td_api::chatMemberStatusRestricted::ID) {
+                         return answer_query(td::JsonTrue(), std::move(query));
+                       }
+
+                       // Impliment unrestrict_chat_member feature
+                       
+                     });
+               } else {
+                 // Impliment unrestrict_chat_member feature
+               }
+             });
+
+  
+}
+
 td::Status Client::process_ban_chat_sender_chat_query(PromisedQueryPtr &query) {
   auto chat_id = query->arg("chat_id");
   auto sender_chat_id = query->arg("sender_chat_id");
