@@ -5,8 +5,6 @@ The Telegram Bot API provides an HTTP API for creating `Telegram Bots <https://c
 
 If you've got any questions about bots or would like to report an issue with your bot, kindly contact us at `@BotSupport <https://t.me/BotSupport>`_ in Telegram.
 
-.. note::
-
    This project is a **fork** of the official `Telegram Bot API server <https://github.com/tdlib/telegram-bot-api>`_. 
 
    In addition to all existing features, we have added support for debugging through a Web mode. You can now use the following query parameters to specify the output format:
