@@ -1,5 +1,5 @@
-name: "📚 Missing Documentation"
-description: "Report missing, outdated, or unclear documentation for TLBAS."
+name: 📚 Missing Documentation
+description: Report missing, outdated, or unclear documentation for TLBAS.
 title: "[DOCS] ${{ summary }}"
 labels:
   - documentation
@@ -17,7 +17,9 @@ body:
       label: "**Preliminary Checks**"
       options:
         - label: "I have searched the existing [TLBAS documentation](https://tlbas.vai-prog.ru/docs) and couldn't find the information."
+          required: true
         - label: "I have searched the existing [issues](https://github.com/Vadim-Khristenko/tlbas/issues) and this documentation gap hasn't been reported yet."
+          required: true
 
   - type: input
     id: summary
@@ -25,6 +27,7 @@ body:
       label: "Short and clear summary"
       description: "Provide a short summary of the documentation issue."
       placeholder: "e.g. Missing advanced configuration guide"
+    validations:
       required: true
 
   - type: textarea
@@ -33,6 +36,7 @@ body:
       label: "❓ What is missing, incorrect, or unclear?"
       description: "Describe exactly what information is missing, outdated, or confusing."
       placeholder: "For example: The integration section for XYZ lacks code examples."
+    validations:
       required: true
 
   - type: textarea
@@ -44,6 +48,7 @@ body:
         - File: `docs/setup.md`
         - URL: `https://tlbas.vai-prog.ru/docs/setup`
         - Section: `Advanced Configuration`
+    validations:
       required: true
 
   - type: textarea
@@ -52,6 +57,7 @@ body:
       label: "🤔 Why is this documentation important?"
       description: "Explain the impact of the missing or unclear documentation."
       placeholder: "e.g. Without this info, users cannot configure CI/CD correctly."
+    validations:
       required: true
 
   - type: textarea
@@ -60,7 +66,6 @@ body:
       label: "🛠 Suggested Improvement (Optional)"
       description: "If you have an idea how to fix or improve the docs, share it here."
       placeholder: "e.g. Add a code snippet showing how to set `--env` variables."
-      required: false
 
   - type: textarea
     id: additional-context
@@ -68,4 +73,3 @@ body:
       label: "📚 Additional Context (Optional)"
       description: "Add any other details, links to related issues, or screenshots."
       placeholder: "Any additional information that might help."
-      required: false

@@ -1,5 +1,5 @@
-name: "🚀 Feature Suggestion"
-description: "Suggest a new feature or improvement for TLBAS."
+name: 🚀 Feature Suggestion
+description: Suggest a new feature or improvement for TLBAS.
 title: "[FEATURE] ${{ summary }}"
 labels:
   - enhancement
@@ -17,6 +17,7 @@ body:
       label: "**Preliminary Checks**"
       options:
         - label: "I have searched the existing [issues](https://github.com/Vadim-Khristenko/tlbas/issues) and this feature request hasn't been suggested yet."
+          required: true
 
   - type: input
     id: summary
@@ -24,6 +25,7 @@ body:
       label: "Short and clear summary"
       description: "Provide a brief summary of the feature."
       placeholder: "e.g. Support custom themes"
+    validations:
       required: true
 
   - type: textarea
@@ -32,6 +34,7 @@ body:
       label: "💡 Problem Statement / Motivation"
       description: "Describe the problem or limitation you’re facing."
       placeholder: "e.g. It is not possible to customize UI colors without core changes."
+    validations:
       required: true
 
   - type: textarea
@@ -40,6 +43,7 @@ body:
       label: "🚀 Proposed Solution"
       description: "Detail how the new feature should work."
       placeholder: "e.g. Add a `--theme` flag that loads a custom CSS file."
+    validations:
       required: true
 
   - type: textarea
@@ -48,7 +52,6 @@ body:
       label: "✅ Acceptance Criteria (Optional)"
       description: "Define how we will know this feature is complete."
       placeholder: "- Users can pass `--theme` to the CLI\n- Theme CSS is applied correctly"
-      required: false
 
   - type: textarea
     id: alternatives
@@ -56,7 +59,6 @@ body:
       label: "🔄 Alternatives Considered (Optional)"
       description: "Describe any alternative solutions you considered."
       placeholder: "e.g. Using environment variables, but they don't cover all use cases."
-      required: false
 
   - type: textarea
     id: drawbacks
@@ -64,7 +66,6 @@ body:
       label: "⚖️ Potential Drawbacks (Optional)"
       description: "List any trade‑offs or downsides."
       placeholder: "e.g. Increased complexity in the configuration loader."
-      required: false
 
   - type: textarea
     id: additional-context
@@ -72,4 +73,3 @@ body:
       label: "📚 Additional Context (Optional)"
       description: "Add any other context, mockups, or links."
       placeholder: "Screenshots, examples, or related discussions."
-      required: false

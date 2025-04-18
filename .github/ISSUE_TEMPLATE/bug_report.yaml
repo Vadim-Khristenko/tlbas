@@ -1,5 +1,5 @@
-name: "🐞 Bug Report"
-description: "Report a problem or unexpected behavior in TLBAS."
+name: 🐞 Bug Report
+description: Report a problem or unexpected behavior in TLBAS.
 title: "[BUG] ${{ summary }}"
 labels:
   - bug
@@ -17,7 +17,9 @@ body:
       label: "**Preliminary Checks**"
       options:
         - label: "I have searched the existing [issues](https://github.com/Vadim-Khristenko/tlbas/issues) and this bug hasn't been reported yet."
+          required: true
         - label: "I am using the latest version of TLBAS (or specified the version below)."
+          required: true
         - label: "I have tried to reproduce the bug with minimal configuration/code (if applicable)."
 
   - type: input
@@ -26,6 +28,7 @@ body:
       label: "Short and clear summary"
       description: "Provide a short summary of the bug."
       placeholder: "e.g. Crash on startup"
+    validations:
       required: true
 
   - type: textarea
@@ -49,18 +52,24 @@ body:
         1. Step 1
         2. Step 2
         3. Step 3
+    validations:
+      required: true
 
   - type: textarea
     id: expected-behavior
     attributes:
       label: "🤔 Expected Behavior"
       placeholder: "Describe what you expected to happen."
+    validations:
+      required: true
 
   - type: textarea
     id: actual-behavior
     attributes:
       label: "😲 Actual Behavior"
       placeholder: "Describe what actually happened."
+    validations:
+      required: true
 
   - type: textarea
     id: minimal-reproducible-example
@@ -68,18 +77,18 @@ body:
       label: "⚙️ Minimal Reproducible Example (If applicable)"
       description: "Provide a minimal snippet, config, or inputs that trigger the bug."
       placeholder: |
-        ```cpp
         // your code here
-        ```
+        ...
+      render: cpp
 
   - type: textarea
     id: logs
     attributes:
       label: "📸 Screenshots / Logs / Stack Traces"
       placeholder: |
-        ```text
         Paste logs or stack traces here
-        ```
+        ...
+      render: sh
 
   - type: textarea
     id: environment
@@ -94,6 +103,8 @@ body:
         **Build Configuration:**
         **Relevant Dependencies:**
         **Other Relevant Info:**
+    validations:
+      required: true
 
   - type: dropdown
     id: severity
