@@ -1,0 +1,122 @@
+name: "🐞 Bug Report"
+description: "Report a problem or unexpected behavior in TLBAS."
+title: "[BUG] ${{ summary }}"
+labels:
+  - bug
+  - needs triage
+assignees: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        <!-- Thank you for reporting the bug! Please provide as many details as possible for reproduction and fixing. -->
+        
+  - type: checkboxes
+    id: preliminary-checks
+    attributes:
+      label: "**Preliminary Checks**"
+      options:
+        - label: "I have searched the existing [issues](https://github.com/Vadim-Khristenko/tlbas/issues) and this bug hasn't been reported yet."
+        - label: "I am using the latest version of TLBAS (or specified the version I'm using below)."
+        - label: "I have tried to reproduce the bug with minimal configuration/code (if applicable)."
+
+  - type: input
+    id: summary
+    attributes:
+      label: "Short and clear summary"
+      description: "Provide a short summary of the bug."
+      placeholder: "e.g. Crash on startup"
+      required: true
+
+  - type: textarea
+    id: detailed-description
+    attributes:
+      label: "🔎 Detailed Description"
+      description: "Provide a clear and concise description of exactly what the bug is."
+      placeholder: "Bug description."
+      required: true
+
+  - type: textarea
+    id: steps-to-reproduce
+    attributes:
+      label: "📝 Steps To Reproduce"
+      description: |
+        Provide precise steps to reproduce the behavior.  
+        Example:  
+        1. Go to '...'  
+        2. Click on '...'  
+        3. See error '...'
+      placeholder: |
+        1. Step 1  
+        2. Step 2  
+        3. Step 3
+      required: true
+
+  - type: textarea
+    id: expected-behavior
+    attributes:
+      label: "🤔 Expected Behavior"
+      placeholder: "Describe what you expected to happen."
+      required: true
+
+  - type: textarea
+    id: actual-behavior
+    attributes:
+      label: "😲 Actual Behavior"
+      placeholder: "Describe what actually happened."
+      required: true
+
+  - type: textarea
+    id: minimal-reproducible-example
+    attributes:
+      label: "⚙️ Minimal Reproducible Example (If applicable)"
+      description: "Provide a minimal snippet, config, or inputs that trigger the bug."
+      placeholder: |
+        ```cpp
+        // your code here
+        ```
+      required: false
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: "📸 Screenshots / Logs / Stack Traces"
+      placeholder: |
+        ```text
+        Paste logs or stack traces here
+        ```
+      required: false
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: "💻 Environment"
+      description: "Please complete the following information:"
+      placeholder: |
+        **TLBAS Version/Commit:**  
+        **Operating System:**  
+        **Architecture:**  
+        **Compiler/Interpreter/Runtime:**  
+        **Build Configuration:**  
+        **Relevant Dependencies:**  
+        **Other Relevant Info:**  
+      required: true
+
+  - type: dropdown
+    id: severity
+    attributes:
+      label: "🚦 Severity (Optional)"
+      options:
+        - Blocker
+        - Critical
+        - Major
+        - Minor
+        - Trivial
+      required: false
+
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: "📚 Additional Context (Optional)"
+      placeholder: "Add any other relevant context here."
+      required: false

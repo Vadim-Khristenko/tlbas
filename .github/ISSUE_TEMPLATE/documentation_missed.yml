@@ -1,0 +1,71 @@
+name: "📚 Missing Documentation"
+description: "Report missing, outdated, or unclear documentation for TLBAS."
+title: "[DOCS] ${{ summary }}"
+labels:
+  - documentation
+  - needs triage
+assignees: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        <!-- Thank you for helping improve TLBAS documentation! Please fill out this form as completely as possible. -->
+
+  - type: checkboxes
+    id: preliminary-checks
+    attributes:
+      label: "**Preliminary Checks**"
+      options:
+        - label: "I have searched the existing [TLBAS documentation](https://tlbas.vai-prog.ru/docs) and couldn't find the information."
+        - label: "I have searched the existing [issues](https://github.com/Vadim-Khristenko/tlbas/issues) and this documentation gap hasn't been reported yet."
+
+  - type: input
+    id: summary
+    attributes:
+      label: "Short and clear summary"
+      description: "Provide a short summary of the documentation issue."
+      placeholder: "e.g. Missing advanced configuration guide"
+      required: true
+
+  - type: textarea
+    id: missing-issue
+    attributes:
+      label: "❓ What is missing, incorrect, or unclear?"
+      description: "Describe exactly what information is missing, outdated, or confusing."
+      placeholder: "For example: The integration section for XYZ lacks code examples."
+      required: true
+
+  - type: textarea
+    id: expected-location
+    attributes:
+      label: "📍 Where did you expect to find this information?"
+      description: "List the file(s), URLs, or documentation sections where this info should be."
+      placeholder: |
+        - File: `docs/setup.md`
+        - URL: `https://tlbas.vai-prog.ru/docs/setup`
+        - Section: `Advanced Configuration`
+      required: true
+
+  - type: textarea
+    id: importance
+    attributes:
+      label: "🤔 Why is this documentation important?"
+      description: "Explain the impact of the missing or unclear documentation."
+      placeholder: "e.g. Without this info, users cannot configure CI/CD correctly."
+      required: true
+
+  - type: textarea
+    id: suggestion
+    attributes:
+      label: "🛠 Suggested Improvement (Optional)"
+      description: "If you have an idea how to fix or improve the docs, share it here."
+      placeholder: "e.g. Add a code snippet showing how to set `--env` variables."
+      required: false
+
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: "📚 Additional Context (Optional)"
+      description: "Add any other details, links to related issues, or screenshots."
+      placeholder: "Any additional information that might help."
+      required: false
