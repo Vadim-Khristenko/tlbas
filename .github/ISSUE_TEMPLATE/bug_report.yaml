@@ -14,7 +14,7 @@ body:
   - type: checkboxes
     id: preliminary-checks
     attributes:
-      label: "**Preliminary Checks**"
+      label: "Preliminary Checks"
       options:
         - label: "I have searched the existing [issues](https://github.com/Vadim-Khristenko/tlbas/issues) and this bug hasn't been reported yet."
           required: true
