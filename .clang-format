@@ -1,135 +1,154 @@
 ---
+# ------------------------------------------------------------------------------
+# TLbas .clang-format
+# Project: TLbas (https://github.com/Vadim-Khristenko/tlbas)
+# Purpose: Enforces consistent, modern, and readable C++ code style for the TLbas project.
+# Compatible with: ClangFormat 18+, C++20/23/26 projects.
+# 
+# Highlights:
+# - Google-based, fine-tuned for modern C++.
+# - Explicit support for TLbas-specific attribute macros.
+# - Designed for cross-platform codebases.
+# - Maintains maximum readability and diff-friendliness.
+# - Encourages best practices for both contributors and maintainers.
+# 
+# For questions or contributions, see: https://github.com/Vadim-Khristenko/tlbas
+# ------------------------------------------------------------------------------
+
+# =============================[ Language & Style ]=============================
 Language:        Cpp
-# BasedOnStyle:  Google
-AccessModifierOffset: -1
-AlignAfterOpenBracket: Align
-AlignArrayOfStructures: None
-AlignConsecutiveAssignments:
-  Enabled:         false
-  AcrossEmptyLines: false
-  AcrossComments:  false
-  AlignCompound:   false
-  PadOperators:    true
-AlignConsecutiveBitFields:
-  Enabled:         false
-  AcrossEmptyLines: false
-  AcrossComments:  false
-  AlignCompound:   false
-  PadOperators:    false
-AlignConsecutiveDeclarations:
-  Enabled:         false
-  AcrossEmptyLines: false
-  AcrossComments:  false
-  AlignCompound:   false
-  PadOperators:    false
-AlignConsecutiveMacros:
-  Enabled:         false
-  AcrossEmptyLines: false
-  AcrossComments:  false
-  AlignCompound:   false
-  PadOperators:    false
-AlignEscapedNewlines: Left
-AlignOperands:   Align
-AlignTrailingComments:
-  Kind:            Always
-  OverEmptyLines:  0
-AllowAllArgumentsOnNextLine: true
-AllowAllParametersOfDeclarationOnNextLine: true
-AllowShortBlocksOnASingleLine: Never
-AllowShortCaseLabelsOnASingleLine: false
-AllowShortEnumsOnASingleLine: true
-AllowShortFunctionsOnASingleLine: None # All
-AllowShortIfStatementsOnASingleLine: Never # WithoutElse
-AllowShortLambdasOnASingleLine: Inline # All
-AllowShortLoopsOnASingleLine: false # true
+BasedOnStyle:    Google
+Standard:        Latest   # Use latest supported C++ standard
+
+# =============================[ Indentation Rules ]============================
+IndentWidth:     2
+TabWidth:        2
+UseTab:          Never
+ContinuationIndentWidth: 4
+ConstructorInitializerIndentWidth: 4
+IndentCaseLabels: true
+IndentCaseBlocks: false
+IndentWrappedFunctionNames: false
+IndentAccessModifiers: false
+IndentPPDirectives: None
+IndentGotoLabels: true
+IndentRequiresClause: true
+NamespaceIndentation: None
+LambdaBodyIndentation: Signature
+
+# ==========================[ Line Length & Whitespace ]=========================
+ColumnLimit:     100
+MaxEmptyLinesToKeep: 1
+KeepEmptyLinesAtTheStartOfBlocks: false
+EmptyLineBeforeAccessModifier: LogicalBlock
+EmptyLineAfterAccessModifier: Never
+InsertNewlineAtEOF: true
+
+# ===========================[ Braces & Block Style ]===========================
+BreakBeforeBraces: Attach
+BraceWrapping:
+  AfterClass:          false
+  AfterControlStatement: Never
+  AfterEnum:           false
+  AfterFunction:       false
+  AfterNamespace:      false
+  AfterStruct:         false
+  AfterUnion:          false
+  BeforeCatch:         false
+  BeforeElse:          false
+  BeforeLambdaBody:    false
+  IndentBraces:        false
+  SplitEmptyFunction:  true
+  SplitEmptyRecord:    true
+  SplitEmptyNamespace: true
+
+# ===========================[ Line Breaking Rules ]============================
 AlwaysBreakAfterDefinitionReturnType: None
 AlwaysBreakAfterReturnType: None
-AlwaysBreakBeforeMultilineStrings: true
 AlwaysBreakTemplateDeclarations: Yes
-# AttributeMacros:
-#   - __capability
+AlwaysBreakBeforeMultilineStrings: true
 BinPackArguments: true
 BinPackParameters: true
-BitFieldColonSpacing: Both
-BraceWrapping:
-  AfterCaseLabel:  false
-  AfterClass:      false
-  AfterControlStatement: Never
-  AfterEnum:       false
-  AfterExternBlock: false
-  AfterFunction:   false
-  AfterNamespace:  false
-  AfterObjCDeclaration: false
-  AfterStruct:     false
-  AfterUnion:      false
-  BeforeCatch:     false
-  BeforeElse:      false
-  BeforeLambdaBody: false
-  BeforeWhile:     false
-  IndentBraces:    false
-  SplitEmptyFunction: true
-  SplitEmptyRecord: true
-  SplitEmptyNamespace: true
 BreakAfterAttributes: Never
-# BreakAfterJavaFieldAnnotations: false
-BreakArrays:     true
 BreakBeforeBinaryOperators: None
-BreakBeforeBraces: Attach
 BreakBeforeConceptDeclarations: Always
 BreakBeforeInlineASMColon: OnlyMultiline
 BreakBeforeTernaryOperators: true
-BreakConstructorInitializers: BeforeComma # BeforeColon
-BreakInheritanceList: BeforeComma # BeforeColon
+BreakConstructorInitializers: BeforeComma
+BreakInheritanceList: BeforeComma
 BreakStringLiterals: true
-ColumnLimit:     120 # 80
-CommentPragmas:  '^ IWYU pragma:'
-CompactNamespaces: false
-ConstructorInitializerIndentWidth: 4
-ContinuationIndentWidth: 4
-Cpp11BracedListStyle: true
-DerivePointerAlignment: true
-DisableFormat:   false
-EmptyLineAfterAccessModifier: Never
-EmptyLineBeforeAccessModifier: LogicalBlock
-ExperimentalAutoDetectBinPacking: false
-FixNamespaceComments: true
+BreakArrays: true
+
+# ==============================[ Alignment Rules ]=============================
+AlignAfterOpenBracket: Align
+AlignArrayOfStructures: None
+AlignOperands: Align
+AlignEscapedNewlines: Left
+AlignTrailingComments:
+  Kind: Always
+  OverEmptyLines: 0
+AlignConsecutiveAssignments:
+  Enabled: false
+AlignConsecutiveDeclarations:
+  Enabled: false
+AlignConsecutiveMacros:
+  Enabled: false
+AlignConsecutiveBitFields:
+  Enabled: false
+AlignTemplateParameters: true
+
+# ===============================[ Space Rules ]================================
+SpaceBeforeParens: ControlStatements
+SpaceBeforeRangeBasedForLoopColon: true
+SpaceBeforeAssignmentOperators: true
+SpaceBeforeCaseColon: false
+SpaceBeforeCtorInitializerColon: true
+SpaceBeforeInheritanceColon: true
+SpaceBeforeCpp11BracedList: false
+SpaceAfterCStyleCast: false
+SpaceAfterLogicalNot: false
+SpaceAfterTemplateKeyword: true
+SpaceAroundPointerQualifiers: Default
+SpaceInEmptyParentheses: false
+SpaceInEmptyBlock: false
+SpacesInAngles: Never
+SpacesInConditionalStatement: false
+SpacesInContainerLiterals: true
+SpacesInCStyleCastParentheses: false
+SpacesInLineCommentPrefix:
+  Minimum: 1
+  Maximum: 1
+SpacesBeforeTrailingComments: 2
+SpacesInParentheses: false
+SpacesInSquareBrackets: false
+
+# =======================[ Arrays, Macros, Literals ]===========================
 ForEachMacros:
   - Q_FOREACH_THIS_LIST_MUST_BE_NON_EMPTY
-IncludeBlocks:   Preserve
-IncludeCategories:
-  - Regex:           '.*'
-    Priority:        0
-IndentAccessModifiers: false
-IndentCaseBlocks: false
-IndentCaseLabels: true
-IndentExternBlock: AfterExternBlock
-IndentGotoLabels: true
-IndentPPDirectives: None
-IndentRequiresClause: true
-IndentWidth:     2
-IndentWrappedFunctionNames: false
-InsertBraces:    false
-InsertNewlineAtEOF: false
-# InsertTrailingCommas: None
-IntegerLiteralSeparator:
-  Binary:          0
-  Decimal:         0
-  Hex:             0
-# JavaScriptQuotes: Leave
-# JavaScriptWrapImports: true
-KeepEmptyLinesAtTheStartOfBlocks: false
-LambdaBodyIndentation: Signature
-LineEnding:      DeriveLF
 MacroBlockBegin: ''
-MacroBlockEnd:   ''
-MaxEmptyLinesToKeep: 1
-NamespaceIndentation: None
-# ObjCBinPackProtocolList: Never
-# ObjCBlockIndentWidth: 2
-# ObjCBreakBeforeNestedBlockParam: true
-# ObjCSpaceAfterProperty: false
-# ObjCSpaceBeforeProtocolList: true
-PackConstructorInitializers: NextLine
+MacroBlockEnd: ''
+BitFieldColonSpacing: Both
+IntegerLiteralSeparator:
+  Binary: 0
+  Decimal: 0
+  Hex: 0
+
+# ===========================[ Includes & Imports ]=============================
+IncludeBlocks: Preserve
+IncludeCategories:
+  - Regex: '.*'
+    Priority: 0
+SortIncludes: CaseInsensitive
+SortUsingDeclarations: Lexicographic
+FixNamespaceComments: true
+CompactNamespaces: false
+ShortNamespaceLines: 0
+IncludeIsMainRegex: '([-_](test|unittest))?$'
+
+# =============================[ Miscellaneous ]================================
+Cpp11BracedListStyle: true
+DisableFormat: false
+ExperimentalAutoDetectBinPacking: false
 PenaltyBreakAssignment: 2
 PenaltyBreakBeforeFirstCallParameter: 1
 PenaltyBreakComment: 300
@@ -140,55 +159,42 @@ PenaltyBreakTemplateDeclaration: 10
 PenaltyExcessCharacter: 1000000
 PenaltyIndentedWhitespace: 0
 PenaltyReturnTypeOnItsOwnLine: 200
-PointerAlignment: Right # Left
-PPIndentWidth:   -1
-QualifierAlignment: Leave
+PointerAlignment: Right
 ReferenceAlignment: Pointer
-ReflowComments:  false # true
+PackConstructorInitializers: NextLine
+ReflowComments: true
 RemoveBracesLLVM: false
 RemoveSemicolon: false
+LineEnding: LF
+DeriveLineEnding: false
+
+# ================ [ Modern C++/ClangFormat 18+ Advanced Features ]=============
 RequiresClausePosition: OwnLine
 RequiresExpressionIndentation: OuterScope
-SeparateDefinitionBlocks: Leave
-ShortNamespaceLines: 0 # 1
-SortIncludes: CaseInsensitive # CaseSensitive
-# SortJavaStaticImport: Before
-SortUsingDeclarations: Lexicographic # LexicographicNumeric
-SpaceAfterCStyleCast: false
-SpaceAfterLogicalNot: false
-SpaceAfterTemplateKeyword: true
-SpaceAroundPointerQualifiers: Default
-SpaceBeforeAssignmentOperators: true
-SpaceBeforeCaseColon: false
-SpaceBeforeCpp11BracedList: false
-SpaceBeforeCtorInitializerColon: true
-SpaceBeforeInheritanceColon: true
-SpaceBeforeParens: ControlStatements
-SpaceBeforeParensOptions:
-  AfterControlStatements: true
-  AfterForeachMacros: true
-  AfterFunctionDefinitionName: false
-  AfterFunctionDeclarationName: false
-  AfterIfMacros:   true
-  AfterOverloadedOperator: false
-  AfterRequiresInClause: false
-  AfterRequiresInExpression: false
-  BeforeNonEmptyParentheses: false
-SpaceBeforeRangeBasedForLoopColon: true
-SpaceBeforeSquareBrackets: false
-SpaceInEmptyBlock: false
-SpaceInEmptyParentheses: false
-SpacesBeforeTrailingComments: 2
-SpacesInAngles:  Never
-SpacesInConditionalStatement: false
-SpacesInContainerLiterals: true
-SpacesInCStyleCastParentheses: false
-SpacesInLineCommentPrefix:
-  Minimum:         1
-  Maximum:         1 # -1
-SpacesInParentheses: false
-SpacesInSquareBrackets: false
-Standard:        Auto
-TabWidth:        100 # 8
-UseTab:          Never
+InsertTrailingCommas: Wrapped
+TrailingCommaInBracedInitList: true
+
+# ===================[ TLbas-specific Attribute Macros ]========================
+# Add project-specific macros here for best formatting experience.
+AttributeMacros:
+  - MAYBE_UNUSED
+  - TLBAS_DEPRECATED
+  - TLBAS_EXPORT
+  - TLBAS_NOT_IMPLEMENTED
+  - TLBAS_INLINE
+  - TLBAS_NOINLINE
+  - TLBAS_PURE
+  - TLBAS_CONST
+  - TLBAS_FALLTHROUGH
+  - TLBAS_MAY_ALIAS
+  - TLBAS_UNUSED
+  - TLBAS_FORCE_INLINE
+  - TLBAS_NODISCARD
+  - TLBAS_NORETURN
+  - TLBAS_WEAK
+  - TLBAS_INTERNAL
+  - TLBAS_PUBLIC
+  - TLBAS_PRIVATE
+  - TLBAS_PROTECTED
+
 ...
