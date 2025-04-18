@@ -1,8 +1,139 @@
-**/*build*/
-**/.*.swp
-**/.DS_Store
-bin/
+# ========== General ==========
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*.bak
+*.tmp
+*.log
+*.pid
+
+# ========== Build Files ==========
+build/
+build-*/
+cmake-build-*/
+CMakeFiles/
+CMakeCache.txt
+Makefile
+cmake_install.cmake
+*.o
+*.obj
+*.so
+*.dll
+*.dylib
+*.exe
+*.out
+*.a
+*.lib
+*.pch
+*.pdb
+*.mod
+*.dep
+*.idb
+*.aps
+
+# ========== Dependency & Package Managers ==========
+conan.lock
+conanbuildinfo.*
+conanfile.lock
+vcpkg_installed/
 vcpkg/
-.vs/
-.vscode/
+*.vscode/
+*.vs/
 .idea/
+.vs/
+
+# ========== IDE and Editor Files ==========
+# Visual Studio
+*.vcxproj*
+*.sln
+*.suo
+*.user
+*.userosscache
+*.sdf
+*.opensdf
+*.VC.db
+
+# CLion
+cmake-build-*/
+.idea/
+*.iml
+
+# Qt Creator
+*.pro.user
+*.qbs.user
+*.pro.user.*
+*.moc
+
+# Eclipse
+.cproject
+.project
+.settings/
+
+# Xcode
+*.xcworkspace
+*.xcuserstate
+*.xcuserdatad
+*.xcsettings
+*.xcodeproj
+
+# Code::Blocks
+*.layout
+*.cbp
+*.depend
+*.depend.*
+*.layout.save
+
+# Sublime Text
+*.sublime-workspace
+*.sublime-project
+
+# JetBrains Rider
+.idea/
+*.sln.iml
+
+# ========== OS Specific ==========
+ehthumbs.db
+Icon?
+Desktop.ini
+
+# ========== Miscellaneous ==========
+*.log
+*.cache
+*.diff
+*.patch
+*.orig
+
+# ========== Third-party/Reference Projects ==========
+telegram-bot-api/
+
+# ========== CMake Generated ==========
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+CTestTestfile.cmake
+CPackConfig.cmake
+CPackSourceConfig.cmake
+Testing/
+_compile_commands.json
+
+# ========== Coverage ==========
+*.gcno
+*.gcda
+*.gcov
+coverage/
+*.profraw
+*.profdata
+
+# ========== Sanitizer ==========
+asan.log
+tsan.log
+
+# ========== Clangd/Other LSPs ==========
+.cache/
+.clangd/
+compile_commands.json
+
+# ========== Python helper scripts (optional) ==========
+*.pyc
+__pycache__/
